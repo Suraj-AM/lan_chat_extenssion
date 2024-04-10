@@ -2,28 +2,43 @@ document.addEventListener("DOMContentLoaded", function () {
   const messages = document.getElementById("messages");
   const messageInput = document.getElementById("messageInput");
   const sendButton = document.getElementById("sendButton");
-  const fileInput = document.getElementById("fileInput"); // New file input element
+  const fileInput = document.getElementById("fileInput");
 
   const socket = new WebSocket("ws://192.168.0.200:3011");
 
   socket.onopen = function (event) {
     console.log("Connected to server");
-    appendMessage("connected!");
+    appendMessage("Connected!");
   };
 
   socket.onmessage = function (event) {
-    let data = JSON.parse(event.data);
-    if (data.type === "text") {
-      appendMessage(data.content);
-    } else if (data instanceof Blob) { // Check if the received data is a file
-      // Handle received file
-      const reader = new FileReader();
-      reader.onload = function () {
-        appendMessage(`<strong>File received:</strong> <a href="${reader.result}" download>${data.fileName}</a>`);
-      };
-      reader.readAsDataURL(data);
+    if (typeof event.data === 'string') {
+        // Handle JSON messages
+        let data;
+        try {
+            data = JSON.parse(event.data);
+        } catch (error) {
+            console.error("Error parsing JSON message:", error);
+            return;
+        }
+        if (data.type === "text") {
+            appendMessage(data.content);
+        }
+    } else if (event.data instanceof Blob) {
+        // Handle Blob messages (e.g., file data)
+        appendMessage("File received");
+        const blob = event.data;
+        console.log(blob);
+        const reader = new FileReader();
+        reader.onload = function () {
+            appendMessage(`<strong>File received:</strong> <a href="${reader.result}" target="_blank">Download</a>`);
+        };
+        reader.readAsDataURL(blob);
+    } else {
+        console.error("Unexpected message type:", event.data);
     }
-  };
+};
+
 
   socket.onerror = function (error) {
     console.error("WebSocket error:", error);
@@ -51,14 +66,14 @@ document.addEventListener("DOMContentLoaded", function () {
       reader.onload = function () {
         const fileData = {
           type: "file",
-          content: reader.result,
+          content: reader.result, // Extract base64 string from data URL
+          contentType: file.type,
           fileName: file.name
         };
         socket.send(JSON.stringify(fileData));
-        appendMessage("file send!");
+        appendMessage("File sent!");
       };
-      reader.readAsArrayBuffer(file);
-      document.getElementById("fileInput").value = "";
+      reader.readAsDataURL(file); // Read file as data URL
     }
   });
 
