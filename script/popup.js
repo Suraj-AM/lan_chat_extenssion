@@ -16,6 +16,10 @@ document.addEventListener("DOMContentLoaded", function () {
   // Load messages from localStorage when the page loads
   loadMessages();
 
+  // connect to socket
+  connectToSocket();
+
+
   function loadMessages() {
     const savedMessages = JSON.parse(localStorage.getItem("chatMessages")) || [];
     appendMessage(savedMessages.join("<br>"), false);
@@ -26,54 +30,55 @@ document.addEventListener("DOMContentLoaded", function () {
       socket = new WebSocket("ws://192.168.0.200:3011");
       socket.onopen = function (event) {
         appendMessage("<br>Connected to server", false);
+        socket.onmessage = function (event) {
+          let data;
+          try {
+            // Handle JSON messages
+            data = JSON.parse(event.data);
+          } catch (error) {
+            console.error("Error parsing JSON message:", error);
+            appendMessage("message Received But failed to parse", false);
+            return;
+          }
+
+          if (data.type === "text") {
+
+            appendMessage(data.content, true);
+
+          } else if (data.type == 'file') {
+            // Handle Blob messages (e.g., file data)
+            appendMessage(`File Received! from &nbsp; ${data.ip}`, true)
+            const blob = new Blob([deserializeArrayBuffer(data.content)], { type: data.contentType }); // Deserialize ArrayBuffer
+            const reader = new FileReader();
+            reader.onload = function () {
+              const downloadLink = `<br><strong>${data.ip}:</strong><br><strong>File received:</strong>
+                     <a href="${reader.result}" download="${data.fileName}" target="_blank"> ${data.fileName}</a>`;
+              appendMessage(downloadLink, false);
+            };
+
+            reader.readAsDataURL(blob);
+
+          } else {
+            console.error("Unexpected message type:", event.data);
+          }
+        };
+
+        socket.onerror = function (error) {
+          console.error("WebSocket error:", error);
+        };
+
+        socket.onclose = function (event) {
+          appendMessage("Connection closed\n", false)
+        };
+        sendQueuedMessages();
         return true;
       };
     } catch (error) {
       return false;
     }
   }
-  connectToSocket();
 
-  socket.onmessage = function (event) {
-    let data;
-    try {
-      // Handle JSON messages
-      data = JSON.parse(event.data);
-    } catch (error) {
-      console.error("Error parsing JSON message:", error);
-      appendMessage("message Received But failed to parse", false);
-      return;
-    }
 
-    if (data.type === "text") {
-
-      appendMessage(data.content, true);
-
-    } else if (data.type == 'file') {
-      // Handle Blob messages (e.g., file data)
-      appendMessage(`File Received! from &nbsp; ${data.ip}`, true)
-      const blob = new Blob([deserializeArrayBuffer(data.content)], { type: data.contentType }); // Deserialize ArrayBuffer
-      const reader = new FileReader();
-      reader.onload = function () {
-        const downloadLink = `<br><strong>${data.ip}:</strong><br><strong>File received:</strong>
-               <a href="${reader.result}" download="${data.fileName}" target="_blank"> ${data.fileName}</a>`;
-        appendMessage(downloadLink, false);
-      };
-
-      reader.readAsDataURL(blob);
-
-    } else {
-      console.error("Unexpected message type:", event.data);
-    }
-  };
-
-  socket.onerror = function (error) {
-    console.error("WebSocket error:", error);
-  };
-
-  socket.onclose = function (event) {
-    appendMessage("Connection closed\n", false)
-  };
 
   // Handle send button click
   sendButton.addEventListener("click", function () {
