@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAN Chat</title>
+  <link rel="stylesheet" href="styles/styles.css">
+</head>
+
+<body>
+  <div class="chat-container">
+    <div class="scrollable-content">
+      <pre class="messages" id="messages"></pre>
+      <div >
+        <textarea type="text" id="messageInput" placeholder="Type a message..."></textarea>
+        <!-- Add file input element -->
+        <input type="file" id="fileInput" style="display: none;">
+        <div id="attachment" class="add-attachment">
+          <img src="./icons/paperclip.svg" height="10rem">&nbsp;
+          <a>Add attachment</a>
+        </div>&nbsp;
+        <ul style="margin-bottom: 1rem;">
+          <li class="file-item">
+            <a>
+              <img src="./icons/paperclip.svg" height="10rem">
+              document name
+            </a>
+            <span class="close middleRemove" style="font-size: 0.8rem;" (click)="removeOldFile(document?._id)">
+              <img src="./icons/x.svg" height="10rem">Remove</span>
+          </li>
+        </ul>
+
+      </div>
+    </div>
+    <button id="sendButton" class="custom-btn fixed-bottom">Send</button>
+  </div>
+
+  <script src="script/popup.js"></script>
+</body>
+
+</html>
