@@ -12,8 +12,10 @@ body {
 }
 
 .scrollable-content {
-  height: calc(100% - 25px); /* Adjust height to accommodate fixed button */
-  overflow-y: auto; /* Enable vertical scrolling */
+  height: calc(100% - 25px);
+  /* Adjust height to accommodate fixed button */
+  overflow-y: auto;
+  /* Enable vertical scrolling */
 }
 
 .messages {
@@ -94,17 +96,27 @@ textarea:focus {
 
 
 .add-attachment {
+  position: relative;
   padding: 0.5rem;
-  margin-top: 0.2rem;
+  margin-top: 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid transparent;
+  border-color: #0057b34b;
   cursor: pointer;
+}
+
+.add-attachment:hover {
+  /* Hover styles */
+  border-color: #0057b395;
+  background-color: #0057b321;
 }
 
 .file-item {
   position: relative;
   padding: 0.5rem;
-  margin-top: 0.1rem;
+  margin-top: 0.5rem;
   background-color: rgba(228, 238, 245, 1);
-  border-radius: 10em;
+  border-radius: 0.25rem;
   cursor: pointer;
 }
 
@@ -143,25 +155,30 @@ ul li a {
 /* Track */
 ::-webkit-scrollbar {
   display: auto;
-  width: .2rem; /* Set width of the scrollbar */
+  width: .2rem;
+  /* Set width of the scrollbar */
 }
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: #11a2fdeb; /* Set color of the scrollbar handle */
+  background: #11a2fdeb;
+  /* Set color of the scrollbar handle */
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: #11a2fd7b; /* Set color of the scrollbar handle on hover */
+  background: #11a2fd7b;
+  /* Set color of the scrollbar handle on hover */
 }
 
 /* Track */
 ::-webkit-scrollbar-track {
-  background: #11a1fd40; /* Set color of the scrollbar track */
+  background: #11a1fd40;
+  /* Set color of the scrollbar track */
 }
 
 /* Handle when scrollbar is dragging */
 ::-webkit-scrollbar-thumb:active {
-  background: #11a1fd40; /* Set color of the scrollbar handle when dragging */
+  background: #11a1fd40;
+  /* Set color of the scrollbar handle when dragging */
 }

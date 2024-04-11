@@ -4,24 +4,28 @@ document.addEventListener("DOMContentLoaded", function () {
   const sendButton = document.getElementById("sendButton");
   const fileInput = document.getElementById("fileInput");
   const attachment = document.getElementById("attachment");
+  const fileList = document.getElementById("list");
+
+  messageInput.placeholder = "Press `ENTER` for send message `SHIFT + ENTER` for multiple lines ..."
 
 
   let socket;
   let messageQueue = [];
+  let selectedFile;
 
   // Load messages from localStorage when the page loads
   loadMessages();
 
   function loadMessages() {
     const savedMessages = JSON.parse(localStorage.getItem("chatMessages")) || [];
-    messages.innerHTML = savedMessages.join("\n");
+    appendMessage(savedMessages.join("<br>"), false);
   }
 
   function connectToSocket() {
     try {
       socket = new WebSocket("ws://192.168.0.200:3011");
       socket.onopen = function (event) {
-        appendMessage("Connected to server", false);
+        appendMessage("<br>Connected to server", false);
         return true;
       };
     } catch (error) {
@@ -33,6 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
   socket.onmessage = function (event) {
     let data;
     try {
+      // Handle JSON messages
       data = JSON.parse(event.data);
     } catch (error) {
       console.error("Error parsing JSON message:", error);
@@ -40,20 +45,19 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (data.type === 'string') {
-      // Handle JSON messages
-      if (data.type === "text") {
-        appendMessage(data.content, true);
-      }
+    if (data.type === "text") {
+
+      appendMessage(data.content, true);
+
     } else if (data.type == 'file') {
       // Handle Blob messages (e.g., file data)
-      appendMessage("File received", true);
+      appendMessage(`File Received! from &nbsp; ${data.ip}`, true)
       const blob = new Blob([deserializeArrayBuffer(data.content)], { type: data.contentType }); // Deserialize ArrayBuffer
       const reader = new FileReader();
       reader.onload = function () {
-        const downloadLink = `<strong>File received:</strong>
-               <a href="${reader.result}" download="${data.fileName}" target="_blank">Download file ${data.fileName}</a>`;
-        appendMessage(downloadLink, true);
+        const downloadLink = `<br><strong>${data.ip}:</strong><br><strong>File received:</strong>
+               <a href="${reader.result}" download="${data.fileName}" target="_blank"> ${data.fileName}</a>`;
+        appendMessage(downloadLink, false);
       };
 
       reader.readAsDataURL(blob);
@@ -74,12 +78,31 @@ document.addEventListener("DOMContentLoaded", function () {
   // Handle send button click
   sendButton.addEventListener("click", function () {
     const message = messageInput.value;
+    if (selectedFile) {
+      messageQueue.push(selectedFile);
+      removeFile();
+    }
     if (message.trim() !== "") {
       appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`, true);
       sendMessage({ type: "text", content: escapeHtml(message) });
       messageInput.value = "";
+    } else {
+      sendQueuedMessages();
     }
   });
+
+  messageInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      const message = messageInput.value;
+      messageInput.value = "";
+      if (message.trim() !== "") {
+        appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`);
+        sendMessage({ type: "text", content: escapeHtml(message) });
+      }
+    }
+  });
+
   attachment.addEventListener("click", function () {
     fileInput.click()
   })
@@ -101,12 +124,43 @@ document.addEventListener("DOMContentLoaded", function () {
         contentType: file.type,
         fileName: file.name
       };
-      sendMessage(fileData);
+      // sendMessage(fileData);
+      selectedFile = fileData
+      addFileInList()
     };
     reader.readAsArrayBuffer(file); // Read file as ArrayBuffer
 
     fileInput.value = ''
   });
+
+
+
+  function addFileInList() {
+    attachment.style.display = 'none';
+    const fileElement = document.createElement("li");
+    fileElement.classList = 'file-item'
+    fileElement.innerHTML = `<a> <img src="./icons/paperclip.svg" height="10rem">&nbsp;${selectedFile.fileName} </a>
+      <span class="close middleRemove" style="font-size: 0.8rem;" id="selectedFile" >
+        <img src="./icons/x.svg" height="10rem">Remove</span>`;
+    fileList.appendChild(fileElement)
+    addEventListenerOnSelectedFile();
+  }
+
+  function addEventListenerOnSelectedFile() {
+    const selectedFileDom = document.getElementById('selectedFile')
+    selectedFileDom.addEventListener('click', function (event) {
+      attachment.style.display = 'block';
+      fileList.innerHTML = '';
+      event.stopPropagation(); // Prevent the click event from bubbling up
+    })
+  }
+
+  function removeFile(params) {
+    attachment.style.display = 'block';
+    fileList.innerHTML = '';
+    selectedFile = null
+  }
+
 
   function appendMessage(message, save) {
     const messageElement = document.createElement("div");
@@ -126,6 +180,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (socket.readyState === WebSocket.CONNECTING) {
       // If the WebSocket is still connecting, add the message to the queue
       messageQueue.push(message);
+
     } else if (socket.readyState === WebSocket.OPEN) {
       // If the WebSocket is open, send the message
       sendQueuedMessages(); // Send any queued messages before sending the current one
