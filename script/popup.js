@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let socket;
   let messageQueue = [];
-  let selectedFile;
+  let selectedFile = [];
 
   // Load messages from localStorage when the page loads
   loadMessages();
@@ -27,10 +27,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function connectToSocket() {
     try {
-      socket = new WebSocket("ws://192.168.0.200:3011");
+      socket = new WebSocket("ws://192.168.0.147:3011");
       socket.onopen = function (event) {
         appendMessage("<br>Connected to server", false);
-        socket.onmessage = function (event) {
+        socket.onmessage = async function (event) {
           let data;
           try {
             // Handle JSON messages
@@ -40,24 +40,16 @@ document.addEventListener("DOMContentLoaded", function () {
             appendMessage("message Received But failed to parse", false);
             return;
           }
+          if (data.text || data.files) {
+            if (data.text) {
+              const htmlMessage = `<br><strong>${data.from}:</strong><br>${escapeHtml(data.text)}`;
+              appendMessage(htmlMessage, true);
+            }
 
-          if (data.type === "text") {
+            if (Array.isArray(data.files)) {
+              await addFiles(data.files)
 
-            appendMessage(data.content, true);
-
-          } else if (data.type == 'file') {
-            // Handle Blob messages (e.g., file data)
-            appendMessage(`File Received! from &nbsp; ${data.ip}`, true)
-            const blob = new Blob([deserializeArrayBuffer(data.content)], { type: data.contentType }); // Deserialize ArrayBuffer
-            const reader = new FileReader();
-            reader.onload = function () {
-              const downloadLink = `<br><strong>${data.ip}:</strong><br><strong>File received:</strong>
-                     <a href="${reader.result}" download="${data.fileName}" target="_blank"> ${data.fileName}</a>`;
-              appendMessage(downloadLink, false);
-            };
-
-            reader.readAsDataURL(blob);
-
+            }
           } else {
             console.error("Unexpected message type:", event.data);
           }
@@ -74,8 +66,27 @@ document.addEventListener("DOMContentLoaded", function () {
         return true;
       };
     } catch (error) {
+      console.log(error);
       return false;
     }
+  }
+
+
+  async function addFiles(files) {
+    appendMessage(`<br><strong>File/s Received! from &nbsp; ${files[0].from}<strong>`, true)
+    await asyncForEach(files, (file) => {
+      // Handle Blob messages (e.g., file data)
+
+      const blob = new Blob([deserializeArrayBuffer(file.content)], { type: file.contentType }); // Deserialize ArrayBuffer
+      const reader = new FileReader();
+
+      reader.onload = function () {
+        const downloadLink = `<a href="${reader.result}" download="${file.fileName}" target="_blank"> ${file.fileName}</a>`;
+        appendMessage(downloadLink, false);
+      };
+
+      reader.readAsDataURL(blob);
+    });
   }
 
 
@@ -83,14 +94,22 @@ document.addEventListener("DOMContentLoaded", function () {
   // Handle send button click
   sendButton.addEventListener("click", function () {
     const message = messageInput.value;
-    if (selectedFile) {
-      messageQueue.push(selectedFile);
-      removeFile();
-    }
-    if (message.trim() !== "") {
-      appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`, true);
-      sendMessage({ type: "text", content: escapeHtml(message) });
-      messageInput.value = "";
+    let payload = {}
+    if (message.trim() !== "" || selectedFile) {
+      if (message.trim() !== "") {
+        appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`, true);
+        messageInput.value = "";
+        payload.text = escapeHtml(message);
+      }
+
+      if (selectedFile) {
+        payload = {
+          ...payload,
+          files: selectedFile
+        }
+        removeFile();
+      }
+      sendMessage(payload);
     } else {
       sendQueuedMessages();
     }
@@ -103,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
       messageInput.value = "";
       if (message.trim() !== "") {
         appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`);
-        sendMessage({ type: "text", content: escapeHtml(message) });
+        sendMessage({ text: escapeHtml(message) });
       }
     }
   });
@@ -112,58 +131,80 @@ document.addEventListener("DOMContentLoaded", function () {
     fileInput.click()
   })
 
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      if (selectedFile.length > 0) {
+        sendButton.click()
+      }
+    }
+  })
   // Handle file input change
-  fileInput.addEventListener("change", function (event) {
-    const file = event.target.files[0];
+  fileInput.addEventListener("change", async function (event) {
+    const files = event.target.files;
 
-    if (!file) {
+    if (files.length < 1) {
       console.error("No file selected");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      const fileData = {
-        type: "file",
-        content: serializeArrayBuffer(event.target.result), // Serialize ArrayBuffer
-        contentType: file.type,
-        fileName: file.name
+    await asyncForEach(files, (file, i) => {
+      console.log(file);
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const fileData = {
+          index: selectedFile.length,
+          content: serializeArrayBuffer(event.target.result), // Serialize ArrayBuffer
+          contentType: file.type,
+          fileName: file.name
+        };
+        // sendMessage(fileData);
+        selectedFile.push(fileData)
+        addFileInList(file.name, i)
       };
-      // sendMessage(fileData);
-      selectedFile = fileData
-      addFileInList()
-    };
-    reader.readAsArrayBuffer(file); // Read file as ArrayBuffer
+      reader.readAsArrayBuffer(file); // Read file as ArrayBuffer
+
+    });
 
     fileInput.value = ''
   });
 
+  /**
+   * Async for each
+   */
+  const asyncForEach = async (array, callback) => {
+    for (let index = 0; index < array.length; index++) {
+      await callback(array[index], index, array);
+    }
+  };
 
-
-  function addFileInList() {
-    attachment.style.display = 'none';
+  function addFileInList(name, index) {
+    // attachment.style.display = 'none';
     const fileElement = document.createElement("li");
     fileElement.classList = 'file-item'
-    fileElement.innerHTML = `<a> <img src="./icons/paperclip.svg" height="10rem">&nbsp;${selectedFile.fileName} </a>
-      <span class="close middleRemove" style="font-size: 0.8rem;" id="selectedFile" >
+    fileElement.id = `list${index}`
+    fileElement.innerHTML = `<a> <img src="./icons/paperclip.svg" height="10rem">&nbsp;${name} </a>
+      <span class="close middleRemove" style="font-size: 0.8rem;" id="selectedFile${index}" >
         <img src="./icons/x.svg" height="10rem">Remove</span>`;
     fileList.appendChild(fileElement)
-    addEventListenerOnSelectedFile();
+    addEventListenerOnSelectedFile(`selectedFile${index}`, index);
   }
 
-  function addEventListenerOnSelectedFile() {
-    const selectedFileDom = document.getElementById('selectedFile')
-    selectedFileDom.addEventListener('click', function (event) {
-      attachment.style.display = 'block';
-      fileList.innerHTML = '';
+  function addEventListenerOnSelectedFile(id, index) {
+    const ele = document.getElementById(id)
+    ele.addEventListener('click', function (event) {
+      // attachment.style.display = 'block';
+      const listItem = document.getElementById(`list${index}`)
+      listItem.remove();
+      selectedFile = selectedFile.filter(file => file.index !== index)
+      console.log(selectedFile);
       event.stopPropagation(); // Prevent the click event from bubbling up
     })
   }
 
   function removeFile(params) {
-    attachment.style.display = 'block';
+    // attachment.style.display = 'block';
     fileList.innerHTML = '';
-    selectedFile = null
+    selectedFile = []
   }
 
 
