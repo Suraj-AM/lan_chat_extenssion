@@ -27,32 +27,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function connectToSocket() {
     try {
-      socket = new WebSocket("ws://192.168.0.147:3011");
+      socket = new WebSocket("ws://192.168.0.145:3011");
       socket.onopen = function (event) {
         appendMessage("<br>Connected to server", false);
+        sendQueuedMessages();
+
         socket.onmessage = async function (event) {
-          let data;
-          try {
-            // Handle JSON messages
-            data = JSON.parse(event.data);
-          } catch (error) {
-            console.error("Error parsing JSON message:", error);
-            appendMessage("message Received But failed to parse", false);
-            return;
-          }
-          if (data.text || data.files) {
-            if (data.text) {
-              const htmlMessage = `<br><strong>${data.from}:</strong><br>${escapeHtml(data.text)}`;
-              appendMessage(htmlMessage, true);
-            }
-
-            if (Array.isArray(data.files)) {
-              await addFiles(data.files)
-
-            }
-          } else {
-            console.error("Unexpected message type:", event.data);
-          }
+          await handleMessageOfSocket(event)
         };
 
         socket.onerror = function (error) {
@@ -62,7 +43,6 @@ document.addEventListener("DOMContentLoaded", function () {
         socket.onclose = function (event) {
           appendMessage("Connection closed\n", false)
         };
-        sendQueuedMessages();
         return true;
       };
     } catch (error) {
@@ -72,8 +52,34 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
 
-  async function addFiles(files) {
-    appendMessage(`<br><strong>File/s Received! from &nbsp; ${files[0].from}<strong>`, true)
+  async function handleMessageOfSocket(event) {
+    let data;
+    try {
+      // Handle JSON messages
+      data = JSON.parse(event.data);
+    } catch (error) {
+      console.error("Error parsing JSON message:", error);
+      appendMessage("message Received But failed to parse", false);
+      return;
+    }
+    if (data.text || data.files) {
+      if (data.text) {
+        const htmlMessage = `<br><strong>${data.from}:</strong><br>${escapeHtml(data.text)}`;
+        appendMessage(htmlMessage, true);
+      }
+
+      if (Array.isArray(data.files)) {
+        await addFiles(data.files, data.from)
+
+      }
+    } else {
+      console.error("Unexpected message type:", event.data);
+    }
+  }
+
+
+  async function addFiles(files, from) {
+    appendMessage(`<br><strong>File/s Received! from &nbsp; ${from}<strong>`, true)
     await asyncForEach(files, (file) => {
       // Handle Blob messages (e.g., file data)
 
@@ -95,14 +101,14 @@ document.addEventListener("DOMContentLoaded", function () {
   sendButton.addEventListener("click", function () {
     const message = messageInput.value;
     let payload = {}
-    if (message.trim() !== "" || selectedFile) {
+    if (message.trim() !== "" || selectedFile.length > 0) {
       if (message.trim() !== "") {
         appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`, true);
         messageInput.value = "";
         payload.text = escapeHtml(message);
       }
 
-      if (selectedFile) {
+      if (selectedFile.length > 0) {
         payload = {
           ...payload,
           files: selectedFile
@@ -122,7 +128,15 @@ document.addEventListener("DOMContentLoaded", function () {
       messageInput.value = "";
       if (message.trim() !== "") {
         appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`);
-        sendMessage({ text: escapeHtml(message) });
+        let payload = { text: escapeHtml(message) }
+        if (selectedFile.length > 0) {
+          payload = {
+            ...payload,
+            files: selectedFile
+          }
+          removeFile();
+        }
+        sendMessage(payload);
       }
     }
   });
@@ -195,8 +209,8 @@ document.addEventListener("DOMContentLoaded", function () {
       // attachment.style.display = 'block';
       const listItem = document.getElementById(`list${index}`)
       listItem.remove();
-      selectedFile = selectedFile.filter(file => file.index !== index)
-      console.log(selectedFile);
+      selectedFile = selectedFile.filter(file => file.index !== index);
+
       event.stopPropagation(); // Prevent the click event from bubbling up
     })
   }
