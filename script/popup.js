@@ -46,7 +46,8 @@ document.addEventListener("DOMContentLoaded", function () {
         return true;
       };
     } catch (error) {
-      console.log(error);
+      console.log("error", error);
+      appendMessage("<strong></strong>connection Failed</strong>", false)
       return false;
     }
   }
@@ -164,10 +165,10 @@ document.addEventListener("DOMContentLoaded", function () {
     await asyncForEach(files, (file, i) => {
       console.log(file);
       const reader = new FileReader();
-      reader.onload = function (event) {
+      reader.onload = async function (event) {
         const fileData = {
           index: selectedFile.length,
-          content: serializeArrayBuffer(event.target.result), // Serialize ArrayBuffer
+          content: await serializeArrayBuffer(event.target.result), // Serialize ArrayBuffer
           contentType: file.type,
           fileName: file.name
         };
@@ -215,7 +216,7 @@ document.addEventListener("DOMContentLoaded", function () {
     })
   }
 
-  function removeFile(params) {
+  function removeFile() {
     // attachment.style.display = 'block';
     fileList.innerHTML = '';
     selectedFile = []
