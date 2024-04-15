@@ -163,7 +163,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     await asyncForEach(files, (file, i) => {
-      console.log(file);
       const reader = new FileReader();
       reader.onload = async function (event) {
         const fileData = {
