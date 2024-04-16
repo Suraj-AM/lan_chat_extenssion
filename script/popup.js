@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (savedMessages.length > 0) {
       savedMessages.forEach(message => {
         const action = message.from == 'YOU' ? 'SENT' : 'RECEIVED'
-        appendMessage(escapeHtml(message.message), message.from, false, action);
+        appendMessage(message.message, message.from, false, action);
       });
     }
   }

@@ -178,6 +178,11 @@ ul li a {
   background: #11a1fd40;
 }
 
+/* For horizontal scrollbar */
+::-webkit-scrollbar:horizontal {
+  height: .2rem;
+}
+
 .message {
   margin: 8px 0;
   padding: 8px;
