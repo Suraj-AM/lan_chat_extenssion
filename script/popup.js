@@ -45,11 +45,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
         socket.onerror = function (error) {
           console.error("WebSocket error:", error);
-          appendMessage(`WebSocket error:\n${error}`, null, false, 'CONNECTION_END');
+          appendMessage(`WebSocket error:\n${JSON.stringify(error, 0, 2)}`, null, false, 'CONNECTION_END');
         };
 
         socket.onclose = function (event) {
-          appendMessage(`Connection closed\n${event}`, null, false, 'CONNECTION_END');
+          appendMessage(`Connection closed\n`, null, false, 'CONNECTION_END');
         };
         return true;
       };
