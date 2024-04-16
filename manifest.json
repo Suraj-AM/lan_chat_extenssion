@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "LAN Chat",
-    "version": "1.0",
+    "version": "2.0",
     "description": "A simple LAN chat extension.",
     "permissions": [
       "tabs",
