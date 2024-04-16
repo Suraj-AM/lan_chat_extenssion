@@ -22,14 +22,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function loadMessages() {
     const savedMessages = JSON.parse(localStorage.getItem("chatMessages")) || [];
-    appendMessage(savedMessages.join("<br>"), false);
+    if (savedMessages.length > 0) {
+      savedMessages.forEach(message => {
+        const action = message.from == 'YOU' ? 'SENT' : 'RECEIVED'
+        appendMessage(escapeHtml(message.message), message.from, false, action);
+      });
+    }
   }
 
   function connectToSocket() {
     try {
       socket = new WebSocket("ws://192.168.0.145:3011");
       socket.onopen = function (event) {
-        appendMessage("<br>Connected to server", false);
+        appendMessage("Connected to server", null, false, 'CONNECTION_ESTABLISHED');
         sendQueuedMessages();
 
         socket.onmessage = async function (event) {
@@ -38,16 +43,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
         socket.onerror = function (error) {
           console.error("WebSocket error:", error);
+          appendMessage(`WebSocket error:\n${error}`, null, false, 'CONNECTION_END');
         };
 
         socket.onclose = function (event) {
-          appendMessage("Connection closed\n", false)
+          appendMessage(`Connection closed\n${event}`, null, false, 'CONNECTION_END');
         };
         return true;
       };
     } catch (error) {
-      console.log("error", error);
-      appendMessage("<strong></strong>connection Failed</strong>", false)
+      console.log("error ==>", error);
+      appendMessage("<strong>connection Failed</strong>", null, false, 'CONNECTION_END');
       return false;
     }
   }
@@ -60,13 +66,12 @@ document.addEventListener("DOMContentLoaded", function () {
       data = JSON.parse(event.data);
     } catch (error) {
       console.error("Error parsing JSON message:", error);
-      appendMessage("message Received But failed to parse", false);
+      appendMessage("Message Received but Failed to Parse", null, false, 'CONNECTION_END');
       return;
     }
     if (data.text || data.files) {
       if (data.text) {
-        const htmlMessage = `<br><strong>${data.from}:</strong><br>${escapeHtml(data.text)}`;
-        appendMessage(htmlMessage, true);
+        appendMessage(escapeHtml(data.text), data.from, true, 'RECEIVED');
       }
 
       if (Array.isArray(data.files)) {
@@ -80,16 +85,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
   async function addFiles(files, from) {
-    appendMessage(`<br><strong>File/s Received! from &nbsp; ${from}<strong>`, true)
+    appendMessage(`<strong>File/s Received! from &nbsp; ${from}<strong>`, null, true, 'RECEIVED');
     await asyncForEach(files, (file) => {
       // Handle Blob messages (e.g., file data)
 
       const blob = new Blob([deserializeArrayBuffer(file.content)], { type: file.contentType }); // Deserialize ArrayBuffer
       const reader = new FileReader();
+      const fileExtension = file.fileName.split('.').pop();
+      const color = generateColor(fileExtension)
 
       reader.onload = function () {
-        const downloadLink = `<a href="${reader.result}" download="${file.fileName}" target="_blank"> ${file.fileName}</a>`;
-        appendMessage(downloadLink, false);
+        const downloadLink = `<a href="${reader.result}" download="${file.fileName}" target="_blank">
+        <div class="file-received fold" style="background:${color}">.${fileExtension}</div>
+        <div style="margin-top:.1rem">${file.fileName.trim()}</div>
+        </a>`;
+        appendMessage(downloadLink, null, false, 'RECEIVED');
       };
 
       reader.readAsDataURL(blob);
@@ -104,9 +114,9 @@ document.addEventListener("DOMContentLoaded", function () {
     let payload = {}
     if (message.trim() !== "" || selectedFile.length > 0) {
       if (message.trim() !== "") {
-        appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`, true);
+        payload.text = message.trim();
+        appendMessage(escapeHtml(message.trim()), 'YOU', true, 'SENT');
         messageInput.value = "";
-        payload.text = escapeHtml(message);
       }
 
       if (selectedFile.length > 0) {
@@ -128,8 +138,11 @@ document.addEventListener("DOMContentLoaded", function () {
       const message = messageInput.value;
       messageInput.value = "";
       if (message.trim() !== "") {
-        appendMessage(`<br><strong>YOU</strong>:<br>${escapeHtml(message.trim())}`);
-        let payload = { text: escapeHtml(message) }
+
+        appendMessage(escapeHtml(message.trim()), 'YOU', true, 'SENT');
+
+        let payload = { text: message.trim() };
+
         if (selectedFile.length > 0) {
           payload = {
             ...payload,
@@ -216,22 +229,54 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function removeFile() {
-    // attachment.style.display = 'block';
+    selectedFile.forEach(file => {
+      appendMessage(` ${file.fileName}`, "File send", true, "SENT");
+    });
     fileList.innerHTML = '';
     selectedFile = []
   }
 
 
-  function appendMessage(message, save) {
+  function appendMessage(message, from, save, action) {
+    // ACTION can be one of the following SENT, RECEIVED, CONNECTION_ESTABLISHED
     const messageElement = document.createElement("div");
-    messageElement.innerHTML = message;
+    messageElement.innerHTML = from ? `<strong>${from} :</strong><br>${message}` : message;
+
+    let className = '';
+    switch (action) {
+      case 'SENT': {
+        className = 'sent';
+        break;
+      }
+
+      case 'RECEIVED': {
+        className = 'received';
+        break;
+      }
+
+      case 'CONNECTION_ESTABLISHED': {
+        className = 'connection-established';
+        break;
+      }
+
+      case 'CONNECTION_END': {
+        className = 'connection-end';
+        break;
+      }
+    }
+
+    if (className) {
+      messageElement.classList.add(className);
+    }
+    messageElement.classList.add('message');
     messages.appendChild(messageElement);
     messages.scrollTop = messages.scrollHeight;
 
     if (save) {
       // Save the message in localStorage
       const savedMessages = JSON.parse(localStorage.getItem("chatMessages")) || [];
-      savedMessages.push(message);
+      const saveMessage = { message, from }
+      savedMessages.push(saveMessage);
       localStorage.setItem("chatMessages", JSON.stringify(savedMessages));
     }
   }
@@ -248,7 +293,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const stringifiedData = JSON.stringify(message);
         socket.send(stringifiedData);
       } catch (err) {
-        appendMessage(`Error to send message ${message}`, false);
+        appendMessage(`Error to send message ${message}`, false, 'CONNECTION_END');
         messageQueue.push(message);
       }
     } else {
@@ -266,7 +311,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const stringifiedData = JSON.stringify(message);
         socket.send(stringifiedData);
       } catch (err) {
-        appendMessage(`Error to send message ${message}`, false);
+        appendMessage(`Error to send message ${message}`, false, 'CONNECTION_END');
       }
     }
   }
@@ -298,3 +343,20 @@ document.addEventListener("DOMContentLoaded", function () {
       .replace(/\n/g, "<br>");
   }
 });
+
+
+function generateColor(text) {
+    // Convert the text to a hash code
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+        hash = text.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // Convert the hash code to a hue value
+    const hue = Math.abs(hash) % 360;
+
+    // Convert the hue value to a CSS HSL color string
+    const color = `hsl(${hue}, 70%, 50%)`;
+
+    return color;
+}
