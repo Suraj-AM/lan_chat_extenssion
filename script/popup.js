@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   messageInput.placeholder = "Press `ENTER` for send message `SHIFT + ENTER` for multiple lines ..."
 
+  const serverLink = '192.168.0.145'
+  const serverPort = '3011'
 
   let socket;
   let messageQueue = [];
@@ -32,9 +34,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function connectToSocket() {
     try {
-      socket = new WebSocket("ws://192.168.0.145:3011");
+      socket = new WebSocket(`ws://${serverLink}:${serverPort}`);
       socket.onopen = function (event) {
-        appendMessage("Connected to server", null, false, 'CONNECTION_ESTABLISHED');
+        appendMessage(`Connected to server: ${serverLink}`, null, false, 'CONNECTION_ESTABLISHED');
         sendQueuedMessages();
 
         socket.onmessage = async function (event) {
@@ -346,17 +348,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 function generateColor(text) {
-    // Convert the text to a hash code
-    let hash = 0;
-    for (let i = 0; i < text.length; i++) {
-        hash = text.charCodeAt(i) + ((hash << 5) - hash);
-    }
+  // Convert the text to a hash code
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = text.charCodeAt(i) + ((hash << 5) - hash);
+  }
 
-    // Convert the hash code to a hue value
-    const hue = Math.abs(hash) % 360;
+  // Convert the hash code to a hue value
+  const hue = Math.abs(hash) % 360;
 
-    // Convert the hue value to a CSS HSL color string
-    const color = `hsl(${hue}, 70%, 50%)`;
+  // Convert the hue value to a CSS HSL color string
+  const color = `hsl(${hue}, 70%, 50%)`;
 
-    return color;
+  return color;
 }
