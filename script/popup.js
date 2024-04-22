@@ -8,56 +8,60 @@ document.addEventListener("DOMContentLoaded", function () {
 
   messageInput.placeholder = "Press `ENTER` for send message `SHIFT + ENTER` for multiple lines ..."
 
-  const serverLink = '192.168.0.145'
-  const serverPort = '3011'
-
-  let socket;
-  let messageQueue = [];
   let selectedFile = [];
 
   // Load messages from localStorage when the page loads
   loadMessages();
 
-  // connect to socket
-  connectToSocket();
+  // set popup name for detect in background
+  chrome.runtime.connect({ name: "messageBox" });
+
+  // Example: Listen for messages from the background script
+  chrome.runtime.onMessage.addListener(async function (message, sender, sendResponse) {
+    if (sender.id === chrome.runtime.id) {
+      // Handle the message received
+      await handleMessageOfSocket(message)
+    }
+  });
 
 
   function loadMessages() {
-    const savedMessages = JSON.parse(localStorage.getItem("chatMessages")) || [];
-    if (savedMessages.length > 0) {
-      savedMessages.forEach(message => {
-        const action = message.from == 'YOU' ? 'SENT' : 'RECEIVED'
-        appendMessage(message.message, message.from, false, action);
-      });
-    }
+    getMessagesFromStorage((savedMessages) => {
+      console.log(savedMessages);
+      if (savedMessages.length > 0) {
+        let action = ''
+        savedMessages.forEach(message => {
+          switch (message.from) {
+            case 'YOU':
+              action = "SENT"
+              break;
+            case 'CONNECTION_ESTABLISHED':
+              delete message.from
+              action = "CONNECTION_ESTABLISHED"
+              break;
+            case 'CONNECTION_END':
+              delete message.from
+              action = "CONNECTION_END"
+              break;
+
+            default:
+              action = "RECEIVED"
+              break;
+          }
+          appendMessage(message.message, message.from, false, action);
+        });
+      }
+    });
   }
 
-  function connectToSocket() {
-    try {
-      socket = new WebSocket(`ws://${serverLink}:${serverPort}`);
-      socket.onopen = function (event) {
-        appendMessage(`Connected to server: ${serverLink}`, null, false, 'CONNECTION_ESTABLISHED');
-        sendQueuedMessages();
+  function getMessagesFromStorage(callback) {
+    // Retrieve the stored messages
+    chrome.storage.local.get("chatMessages", (result) => {
+      const savedMessages = result.chatMessages || [];
 
-        socket.onmessage = async function (event) {
-          await handleMessageOfSocket(event)
-        };
-
-        socket.onerror = function (error) {
-          console.error("WebSocket error:", error);
-          appendMessage(`WebSocket error:\n${JSON.stringify(error, 0, 2)}`, null, false, 'CONNECTION_END');
-        };
-
-        socket.onclose = function (event) {
-          appendMessage(`Connection closed\n`, null, false, 'CONNECTION_END');
-        };
-        return true;
-      };
-    } catch (error) {
-      console.log("error ==>", error);
-      appendMessage("<strong>connection Failed</strong>", null, false, 'CONNECTION_END');
-      return false;
-    }
+      // Pass the retrieved messages to the callback function
+      callback(savedMessages);
+    });
   }
 
 
@@ -65,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let data;
     try {
       // Handle JSON messages
-      data = JSON.parse(event.data);
+      data = JSON.parse(event);
     } catch (error) {
       console.error("Error parsing JSON message:", error);
       appendMessage("Message Received but Failed to Parse", null, false, 'CONNECTION_END');
@@ -83,6 +87,10 @@ document.addEventListener("DOMContentLoaded", function () {
     } else {
       console.error("Unexpected message type:", event.data);
     }
+  }
+
+  function sendMessage(message) {
+    chrome.runtime.sendMessage(message);
   }
 
 
@@ -130,7 +138,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       sendMessage(payload);
     } else {
-      sendQueuedMessages();
+      sendMessage();
     }
   });
 
@@ -168,6 +176,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   })
+
   // Handle file input change
   fileInput.addEventListener("change", async function (event) {
     const files = event.target.files;
@@ -186,7 +195,6 @@ document.addEventListener("DOMContentLoaded", function () {
           contentType: file.type,
           fileName: file.name
         };
-        // sendMessage(fileData);
         selectedFile.push(fileData)
         addFileInList(file.name, i)
       };
@@ -283,41 +291,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function sendMessage(message) {
-    if (socket.readyState === WebSocket.CONNECTING) {
-      // If the WebSocket is still connecting, add the message to the queue
-      messageQueue.push(message);
-
-    } else if (socket.readyState === WebSocket.OPEN) {
-      // If the WebSocket is open, send the message
-      sendQueuedMessages(); // Send any queued messages before sending the current one
-      try {
-        const stringifiedData = JSON.stringify(message);
-        socket.send(stringifiedData);
-      } catch (err) {
-        appendMessage(`Error to send message ${message}`, false, 'CONNECTION_END');
-        messageQueue.push(message);
-      }
-    } else {
-      // If the WebSocket is closed, reconnect and add the message to the queue
-      connectToSocket(); // Reconnect to the WebSocket
-      messageQueue.push(message);
-    }
-  }
-
-  function sendQueuedMessages() {
-    // Send all queued messages
-    while (messageQueue.length > 0) {
-      const message = messageQueue.shift();
-      try {
-        const stringifiedData = JSON.stringify(message);
-        socket.send(stringifiedData);
-      } catch (err) {
-        appendMessage(`Error to send message ${message}`, false, 'CONNECTION_END');
-      }
-    }
-  }
-
   function serializeArrayBuffer(arrayBuffer) {
     const binary = [];
     const bytes = new Uint8Array(arrayBuffer);
@@ -344,21 +317,22 @@ document.addEventListener("DOMContentLoaded", function () {
       .replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>");
   }
-});
 
+  function generateColor(text) {
+    // Convert the text to a hash code
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = text.charCodeAt(i) + ((hash << 5) - hash);
+    }
 
-function generateColor(text) {
-  // Convert the text to a hash code
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    hash = text.charCodeAt(i) + ((hash << 5) - hash);
+    // Convert the hash code to a hue value
+    const hue = Math.abs(hash) % 360;
+
+    // Convert the hue value to a CSS HSL color string
+    const color = `hsl(${hue}, 70%, 50%)`;
+
+    return color;
   }
 
-  // Convert the hash code to a hue value
-  const hue = Math.abs(hash) % 360;
 
-  // Convert the hue value to a CSS HSL color string
-  const color = `hsl(${hue}, 70%, 50%)`;
-
-  return color;
-}
+});
