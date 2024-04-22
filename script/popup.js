@@ -24,6 +24,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.notificationClicked) {
+      // Simulate user click on the extension icon (might not work in all cases)
+      chrome.action.onClicked.dispatch();
+    }
+  });
+
 
   function loadMessages() {
     getMessagesFromStorage((savedMessages) => {

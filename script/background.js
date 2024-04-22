@@ -22,11 +22,16 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 
+chrome.notifications.onClicked.addListener(() => {
+    // Send a message to the popup script indicating a notification click
+    chrome.runtime.sendMessage({ notificationClicked: true });
+});
+
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     if (sender.id === chrome.runtime.id) {
         if (message) {
-            console.log(message);
             if (message.text) {
                 saveMessageToStorage(message.text, "YOU");
             }
@@ -72,7 +77,7 @@ function showNotification(from) {
         type: 'basic',
         iconUrl: '../icons/icon128.png',
         title: 'New Message Received',
-        message: `message received from ${from}`,
+        message: `message received from ${from}`
     });
 }
 
@@ -121,7 +126,6 @@ function connectToSocket() {
 
 function sendMessage(message) {
     if (socket) {
-
         if (socket.readyState === WebSocket.CONNECTING) {
             // If the WebSocket is still connecting, add the message to the queue
             messageQueue.push(message);

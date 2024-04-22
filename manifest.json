@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LAN Chat",
-  "version": "2.1",
+  "version": "3.0",
   "description": "A simple LAN chat extension.",
   "permissions": [
     "tabs",
@@ -14,9 +14,7 @@
   "background": {
     "service_worker": "script/background.js"
   },
-  "host_permissions": [
-    "*://*/*"
-  ],
+  
   "action": {
     "default_popup": "index.html",
     "default_icon": {
