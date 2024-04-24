@@ -21,6 +21,10 @@ chrome.runtime.onInstalled.addListener(() => {
     connectToSocket();
 });
 
+chrome.runtime.onStartup.addListener(() => {
+    console.log("event triggerd for on start up ");
+    connectToSocket();
+});
 
 chrome.notifications.onClicked.addListener(() => {
     // Send a message to the popup script indicating a notification click
@@ -117,7 +121,7 @@ function connectToSocket() {
             saveMessageToStorage(`Connection failed to Server: ${serverLink} At ${dateString}`, "CONNECTION_END");
 
             // Reconnect
-            setTimeout(connectToSocket, 4000);
+            setTimeout(connectToSocket(), 2000);
         };
     } catch (error) {
         console.log("error ==>", error);
@@ -141,10 +145,14 @@ function sendMessage(message) {
                 messageQueue.push(message);
             }
         } else {
+            messageQueue.push(message);
             // If the WebSocket is closed, reconnect and add the message to the queue
             connectToSocket(); // Reconnect to the WebSocket
-            messageQueue.push(message);
         }
+    } else {
+        messageQueue.push(message);
+        // If the WebSocket is closed, reconnect and add the message to the queue
+        connectToSocket(); // Reconnect to the WebSocket
     }
 }
 

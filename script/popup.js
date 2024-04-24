@@ -34,7 +34,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function loadMessages() {
     getMessagesFromStorage((savedMessages) => {
-      console.log(savedMessages);
       if (savedMessages.length > 0) {
         let action = ''
         savedMessages.forEach(message => {
